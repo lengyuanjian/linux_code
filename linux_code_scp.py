@@ -59,7 +59,7 @@ def check_and_copy_files(local_path, remote_path, ssh_host, ssh_port, ssh_userna
     sftp = client.open_sftp()
     while True:
         #判断有没有新加文件
-        new_list = list_files(local_path, ['.git'])
+        new_list = list_files(local_path, ['.git','.vscode'])
         set_c = set(new_list) - set(file_list)
         for file_name in set_c:
             remote_file = path_join_linux(remote_path,file_name)
@@ -86,16 +86,18 @@ def check_and_copy_files(local_path, remote_path, ssh_host, ssh_port, ssh_userna
                 sftp.put(file_name, remote_file)
                 print(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')} diff [{file_name}]->[{remote_file}]")
         print(f"\r{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}  ", end='', flush=True)  
-        time.sleep(2.0)
+        time.sleep(1.0)
     sftp.close()
     client.close() 
  
 if __name__ == '__main__':
     local_path='.'
-    remote_path='/home/lyj/linux_code/'
+    remote_path='/root/linux_code/'
     ssh_host = "10.3.71.91" 
-    ssh_port = 9526
-    ssh_username = "lyj" 
+    ssh_host = "192.168.118.141" 
+    ssh_port = 9526 
+    ssh_port = 22
+    ssh_username = "root" 
     ssh_password = "lyj123"
     check_and_copy_files(local_path, remote_path, ssh_host, ssh_port, ssh_username, ssh_password)
 
