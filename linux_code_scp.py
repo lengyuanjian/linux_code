@@ -74,17 +74,19 @@ def check_and_copy_files(local_path, remote_path, ssh_host, ssh_port, ssh_userna
                 stdin, stdout, stderr = client.exec_command(f'md5sum {remote_file}')
                 ssh_file_md5[file_name]=stdout.read().decode().split()[0]
             except Exception as err:
+                print(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')} scp [{file_name}]->[{remote_file}]")
                 sftp.put(file_name, remote_file)
                 ssh_file_md5[file_name]=calc_md5(file_name)
-                print(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')} scp [{file_name}]->[{remote_file}]")
+                
         file_list = new_list
         for file_name in file_list:
             md5=calc_md5(file_name)
             if md5 != ssh_file_md5[file_name]:
                 remote_file = path_join_linux(remote_path,file_name)
+                print(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')} diff [{file_name}]->[{remote_file}]")
                 ssh_file_md5[file_name]= md5
                 sftp.put(file_name, remote_file)
-                print(f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')} diff [{file_name}]->[{remote_file}]")
+                
         print(f"\r{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}  ", end='', flush=True)  
         time.sleep(1.0)
     sftp.close()
