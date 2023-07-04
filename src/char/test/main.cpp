@@ -11,7 +11,8 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
-
+#include <unistd.h>
+#include "ring_buff.h"
 
 #define MY_IOCTL_MAGIC 'M'
 #define MY_IOCTL_RESET _IO(MY_IOCTL_MAGIC, 0)
@@ -63,21 +64,55 @@ int main() {
 #define MY_IOCTL_UMMAP_MEM _IOWR(MY_IOCTL_MAGIC, 4, int)
     
     char *buff = (char *) mmap (NULL, 2*1024*1024, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-  
+    lgz_ring_buff ring_buf;
+    lgz_init( &ring_buf,2*1024*1024 , buff);
     if (ioctl(fd, MY_IOCTL_RESET, &value) == -1) {
         perror("Failed to execute MY_IOCTL_MMAP_MEM");
         return 1;
     }
-    buff[0] = 10;
-    if (ioctl(fd, MY_IOCTL_RESET, &value) == -1) {
-        perror("Failed to execute MY_IOCTL_UMMAP_MEM");
-        return 1;
-    }
-    buff[1] = 10;
-    if (ioctl(fd, MY_IOCTL_RESET, &value) == -1) {
+  
+    
+    if (ioctl(fd, MY_IOCTL_MMAP_MEM, &value) == -1) {
         perror("Failed to execute MY_IOCTL_SET_VALUE");
         return 1;
     }
+    int * p_r = (int *)buff;
+    int * p_w = (int *)(buff + 4);
+    unsigned char * p_data = (unsigned char *)(buff + 8);
+
+    int t_count = 1000 * 2;
+    unsigned char cut = 0;
+    int t_l = 0;
+    //while(t_count--)
+    {
+        
+        unsigned char tempp[1024] = {};
+        if(-1 == lgz_pop_data(&ring_buf, (char *)tempp, 256))
+        {
+            printf("r[%d] w[%d]\n", *p_r, *p_w);
+        }
+        else
+        {
+            //t_l+=256;
+        }
+        for(int i = 0; i < 256; ++i)
+        {
+            if(cut++ != tempp[i])
+            {
+                printf("error r[%d] w[%d] [%d]\n", *p_r, *p_w, t_l);
+            }
+            else
+            {
+                t_l++;
+            }
+        }
+        usleep(10000);
+    }
+    if (ioctl(fd, MY_IOCTL_UMMAP_MEM, &value) == -1) {
+        perror("Failed to execute MY_IOCTL_SET_VALUE");
+        return 1;
+    }
+
     if (munmap(buff, 2*1024*1024) == -1) {
         perror("Failed to unmap device memory");
         close(fd);

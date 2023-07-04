@@ -10,6 +10,12 @@
 #include <linux/types.h>
 #include <asm/io.h>
 
+#include <linux/kthread.h>
+#include <linux/delay.h>
+
+#include <linux/random.h>
+
+#include "ring_buff.h"
 #define DEVICE_NAME "lyj_driver"
 #define CLASS_NAME "lyj_device_class"
 
@@ -28,72 +34,49 @@ static struct device *mydevice_device = NULL;
 static void *my_driver_memory;
 static int kmalloc_size = 2 * 1024 * 1024;
 
-static int memory_drv_mmap(struct file *pfile, struct vm_area_struct *vma)  
-{  
-	int ret = 0;
-	// struct memory_device *p;
-	// p = pfile->private_data;
-	// vma->vm_flags |= (VM_IO | VM_LOCKED | VM_DONTEXPAND | VM_DONTDUMP);
-    // ret = remap_pfn_range(vma,		/* 映射虚拟内存空间 */  
-    //                    vma->vm_start,/* 映射虚拟内存空间起始地址 */   
-    //                    virt_to_phys(p->mem_buf)>>PAGE_SHIFT,/* 与物理内存对应的页帧号，物理地址右移12位 */
-    //                    (vma->vm_end - vma->vm_start),/* 映射虚拟内存空间大小,页大小的整数倍 */  
-    //                    vma->vm_page_prot);/* 保护属性 */  
-    printk(KERN_INFO "memory_drv_mmap\n");
-    return ret;  
-} 
 
 
-static bool mmap(unsigned long p_virt_addr)
+static struct lgz_ring_buff g_buff;
+
+static struct task_struct *my_thread = NULL;
+
+static unsigned int get_rand(unsigned int min, unsigned int max)
 {
-    // int ret = 0;
-   
-    // // 获取物理地址
-    // unsigned long phys_addr = virt_to_phys(my_driver_memory);
+    unsigned int range = max - min + 1;
+    unsigned int random_value;
 
-    // // 获取当前进程的 mm 结构体
-    // struct mm_struct *mm = current->mm;
+    // 获取随机数
+    get_random_bytes(&random_value, sizeof(random_value));
 
-    // // 计算映射的页数
-    // unsigned long npages = kmalloc_size / PAGE_SIZE;
-
-    // // 获取用户空间虚拟地址
-    // unsigned long virt_addr = p_virt_addr;
-    // if(p_virt_addr == 0)
-    // {
-    //     return false;
-    // }
-    // // 映射物理页面到用户空间
-    // ret = remap_pfn_range(mm, virt_addr, phys_addr >> PAGE_SHIFT, npages * PAGE_SIZE, PAGE_SHARED);
-    // if (ret < 0) {
-    //     // 内存映射失败
-    //     printk(KERN_INFO "mem error \n");
-    //     return false;
-    // }
-    printk(KERN_INFO "mem ok \n");
-    return true;
+    // 计算在指定范围内的随机数
+    return min + (random_value % range);
 }
 
-static bool ummap(unsigned long p_virt_addr)
+static int my_thread_fn(void *data)
 {
-    //int ret = 0;
-    // unsigned long virt_addr = p_virt_addr;
-    // unsigned long npages = kmalloc_size / PAGE_SIZE;
-    // struct mm_struct *mm = current->mm;
-    
-    // if(p_virt_addr == 0)
-    // {
-    //     return false;
-    // }
-    // ret = remap_pfn_range(mm, virt_addr, 0, npages * PAGE_SIZE, PAGE_NONE);
-    // if (ret < 0) {
-    //     // 解除内存映射失败
-    //     // 错误处理
-    //     printk(KERN_INFO "unmem error \n");
-    //     return false;
-    // }
-    printk(KERN_INFO "unmem ok \n");
-    return true;
+    unsigned char cout = 0;
+    unsigned int len = 0;
+    unsigned char buff[1501] = {};
+    unsigned int i = 0;
+    while (!kthread_should_stop()) {
+        // 打印日志
+        len = get_rand(20, 1500);
+        for(i = 0; i < len; ++i)
+        {
+            buff[i] = cout++;
+        }
+        if(-1 == lgz_push_data(&g_buff, buff, len))
+        {
+            cout -= len;
+        }
+        printk(KERN_ERR "push len[%d] cut[%d]\n",len, cout);
+        //if(cout >= 1024 * 10)
+            break;
+        // 休眠 100 毫秒
+        msleep(100);
+    }
+
+    return 0;
 }
 
 static int my_mmap(struct file *filp, struct vm_area_struct *vma)
@@ -153,18 +136,19 @@ static long my_device_ioctl(struct file *file, unsigned int cmd, unsigned long a
             break;
         case MY_IOCTL_MMAP_MEM:
             printk(KERN_INFO "Device my_device_ioctl MY_IOCTL_UMMAP_MEM addr[0x%lx]\n",arg);
-            // 执行获取值操作，并将结果传递回用户空间
-            if (!mmap(arg)) 
+            if (my_thread == NULL) 
             {
-                return -EFAULT;
+                my_thread = kthread_run(my_thread_fn, NULL, "my_thread");
+                printk(KERN_INFO "kthread_start\n");
             }
             break;
         case MY_IOCTL_UMMAP_MEM:
             printk(KERN_INFO "Device my_device_ioctl MY_IOCTL_UMMAP_MEM addr[0x%lx]\n",arg);
-            // 执行获取值操作，并将结果传递回用户空间
-            if (!ummap(arg)) 
+            if (my_thread) 
             {
-                return -EFAULT;
+                kthread_stop(my_thread);
+                my_thread = NULL;
+                printk(KERN_INFO "kthread_stop\n");
             }
             break;
             
@@ -175,8 +159,6 @@ static long my_device_ioctl(struct file *file, unsigned int cmd, unsigned long a
     
     return 0; // 返回0表示成功
 }
-
-
 
 static int device_open(struct inode *inode, struct file *file)
 {
@@ -213,7 +195,8 @@ static struct file_operations fops = {
 
 static int __init chardev_init(void)
 {
-    my_driver_memory = kmalloc(kmalloc_size, GFP_KERNEL);
+    lgz_init(&g_buff, kmalloc_size);
+    my_driver_memory = g_buff.m_p_buff;
     if (!my_driver_memory) 
     {
         // 内存分配失败
@@ -262,7 +245,13 @@ static void __exit chardev_exit(void)
     class_destroy(mydevice_class);
     unregister_chrdev(Major, DEVICE_NAME);
     printk(KERN_INFO "Unregistered char device\n");
-    kfree(my_driver_memory);
+    if (my_thread) 
+    {
+        kthread_stop(my_thread);
+        my_thread = NULL;
+        printk(KERN_INFO "kthread_stop\n");
+    }
+    lgz_close(&g_buff);
     printk(KERN_INFO "kfree mem[%d]\n", kmalloc_size);
 }
 
