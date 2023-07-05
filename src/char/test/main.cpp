@@ -36,43 +36,16 @@ int main() {
     printf("open device[%s] fd[0x%x]\n",DEVICE_PATH,fd);
 
 
-    // 从设备读取数据
-    bytes_read = read(fd, buffer, sizeof(buffer));
-    if (bytes_read < 0) {
-        perror("Failed to read from device");
-        close(fd);
-        return -1;
-    }
-    printf("Read %zd bytes from device: %s\n", bytes_read, buffer);
-
-    // 向设备写入数据
-    bytes_written = write(fd, "Hello, device!", 14);
-    if (bytes_written < 0) {
-        perror("Failed to write to device");
-        close(fd);
-        return -1;
-    }
-    printf("Written %zd bytes to device\n", bytes_written);
-
-     int value = 42;
-    if (ioctl(fd, MY_IOCTL_SET_VALUE, &value) == -1) {
-        perror("Failed to execute MY_IOCTL_SET_VALUE");
-        return 1;
-    }
-
 #define MY_IOCTL_MMAP_MEM _IOWR(MY_IOCTL_MAGIC, 3, int)
 #define MY_IOCTL_UMMAP_MEM _IOWR(MY_IOCTL_MAGIC, 4, int)
     
     char *buff = (char *) mmap (NULL, 2*1024*1024, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     lgz_ring_buff ring_buf;
     lgz_init( &ring_buf,2*1024*1024 , buff);
-    if (ioctl(fd, MY_IOCTL_RESET, &value) == -1) {
-        perror("Failed to execute MY_IOCTL_MMAP_MEM");
-        return 1;
-    }
+    
   
     
-    if (ioctl(fd, MY_IOCTL_MMAP_MEM, &value) == -1) {
+    if (ioctl(fd, MY_IOCTL_MMAP_MEM, NULL) == -1) {
         perror("Failed to execute MY_IOCTL_SET_VALUE");
         return 1;
     }
@@ -80,35 +53,37 @@ int main() {
     int * p_w = (int *)(buff + 4);
     unsigned char * p_data = (unsigned char *)(buff + 8);
 
-    int t_count = 1000 * 2;
+    int t_count = 1024 *1024 *2;
     unsigned char cut = 0;
     int t_l = 0;
-    //while(t_count--)
+
+    while(t_count--)
     {
+        ioctl(fd, MY_IOCTL_RESET, NULL);
         
         unsigned char tempp[1024] = {};
-        if(-1 == lgz_pop_data(&ring_buf, (char *)tempp, 256))
+        int ret =lgz_pop_data(&ring_buf, (char *)tempp, 256);
+        if(ret == -1)
         {
-            printf("r[%d] w[%d]\n", *p_r, *p_w);
+            printf("info r[%d] w[%d] [%d][%d] ret[%d]\n", *p_r, *p_w, *(ring_buf.m_r), *(ring_buf.m_w), ret);
         }
         else
         {
-            //t_l+=256;
-        }
-        for(int i = 0; i < 256; ++i)
-        {
-            if(cut++ != tempp[i])
+            for(int i = 0; i < 256; ++i)
             {
-                printf("error r[%d] w[%d] [%d]\n", *p_r, *p_w, t_l);
-            }
-            else
-            {
-                t_l++;
+                if(cut++ != tempp[i])
+                {
+                    printf("error r[%d] w[%d] [%d]\n", *p_r, *p_w, t_l);
+                }
+                else
+                {
+                    t_l++;
+                }
             }
         }
-        usleep(10000);
+        usleep(1000);
     }
-    if (ioctl(fd, MY_IOCTL_UMMAP_MEM, &value) == -1) {
+    if (ioctl(fd, MY_IOCTL_UMMAP_MEM, NULL) == -1) {
         perror("Failed to execute MY_IOCTL_SET_VALUE");
         return 1;
     }

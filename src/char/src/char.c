@@ -52,28 +52,35 @@ static unsigned int get_rand(unsigned int min, unsigned int max)
     return min + (random_value % range);
 }
 
+static void push_data(void)
+{
+    static unsigned char cout = 0;
+    static unsigned int len = 0;
+    static unsigned char buff[1501] = {};
+    static unsigned int i = 0;
+
+    len = get_rand(20, 1500);
+    for(i = 0; i < len; ++i)
+    {
+        buff[i] = cout++;
+    }
+    if(-1 == lgz_push_data(&g_buff, buff, len))
+    {
+        cout -= len;
+    }
+    printk(KERN_ERR "push len[%d] cut[%d] r[%d] w[%d]\n",len, cout,*(g_buff.m_r),*(g_buff.m_w));
+}
+
 static int my_thread_fn(void *data)
 {
-    unsigned char cout = 0;
-    unsigned int len = 0;
-    unsigned char buff[1501] = {};
-    unsigned int i = 0;
+   
     while (!kthread_should_stop()) {
         // 打印日志
-        len = get_rand(20, 1500);
-        for(i = 0; i < len; ++i)
-        {
-            buff[i] = cout++;
-        }
-        if(-1 == lgz_push_data(&g_buff, buff, len))
-        {
-            cout -= len;
-        }
-        printk(KERN_ERR "push len[%d] cut[%d]\n",len, cout);
+        
         //if(cout >= 1024 * 10)
-            break;
+            //break;
         // 休眠 100 毫秒
-        msleep(100);
+        msleep(1000);
     }
 
     return 0;
@@ -106,33 +113,25 @@ static int my_mmap(struct file *filp, struct vm_area_struct *vma)
 
 static long my_device_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
     int value;
-    const char * p = NULL;
+    const int * p = NULL;
     switch (cmd) 
     {
         case MY_IOCTL_RESET:
             // 执行复位操作
-            p = (const char *)my_driver_memory;
-            printk(KERN_INFO "Device my_device_ioctl MY_IOCTL_RESET [%u][%u][%u][%u]\n", p[0],p[1],p[2],p[3]);
+            push_data();
+            p = (const int *)my_driver_memory;
+            printk(KERN_INFO "Device my_device_ioctl MY_IOCTL_RESET r[%u] w[%u][%u][%u]\n", p[0],p[1],p[2],p[3]);
+            
             break;
             
         case MY_IOCTL_SET_VALUE:
             // 从用户空间获取整数值并执行相应操作
-            printk(KERN_INFO "Device my_device_ioctl MY_IOCTL_SET_VALUE\n");
-            if (copy_from_user(&value, (int *)arg, sizeof(int))) 
-            {
-                return -EFAULT;
-            }
             // 执行设置值操作，使用value作为参数
             break;
             
         case MY_IOCTL_GET_VALUE:
             printk(KERN_INFO "Device my_device_ioctl MY_IOCTL_GET_VALUE\n");
-            // 执行获取值操作，并将结果传递回用户空间
-            value = 42; // 示例，可以根据实际逻辑进行替换
-            if (copy_to_user((int *)arg, &value, sizeof(int))) 
-            {
-                return -EFAULT;
-            }
+             
             break;
         case MY_IOCTL_MMAP_MEM:
             printk(KERN_INFO "Device my_device_ioctl MY_IOCTL_UMMAP_MEM addr[0x%lx]\n",arg);
