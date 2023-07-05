@@ -30,8 +30,8 @@ int lgz_init(struct lgz_ring_buff *p_this, int size, void * k_buff)
     p_this->m_p_data = ((char*)(p_this->m_p_buff)) + 8;
     
     p_this->m_size = size - 8;
-    *(p_this->m_r) = 0;
-    *(p_this->m_w) = 0;
+    //*(p_this->m_r) = 0;
+    //*(p_this->m_w) = 0;
 
     printf("kmalloc size[%d] data size[%d] r_pos[%d] w_pos[%d]\n", size,p_this->m_size,*(p_this->m_r),*(p_this->m_w));
 
