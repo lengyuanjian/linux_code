@@ -59,17 +59,18 @@ int main() {
 
     while(t_count--)
     {
-        ioctl(fd, MY_IOCTL_RESET, NULL);
-        
+       
         unsigned char tempp[1024] = {};
-        int ret =lgz_pop_data(&ring_buf, (char *)tempp, 256);
+        int ret =lgz_pop_data(&ring_buf, (char *)tempp, 512);
+        //printf("[%d] [%d] [%d]\n", cut, tempp[0], tempp[99]);
         if(ret == -1)
         {
-            printf("info r[%d] w[%d] [%d][%d] ret[%d]\n", *p_r, *p_w, *(ring_buf.m_r), *(ring_buf.m_w), ret);
+            printf("info r[%d] w[%d] t_l[%d] ret[%d]\n", *p_r, *p_w, t_l, ret);
+            usleep(1000000);
         }
         else
         {
-            for(int i = 0; i < 256; ++i)
+            for(int i = 0; i < 512; ++i)
             {
                 if(cut++ != tempp[i])
                 {
@@ -81,7 +82,7 @@ int main() {
                 }
             }
         }
-        usleep(1000);
+        //usleep(100);
     }
     if (ioctl(fd, MY_IOCTL_UMMAP_MEM, NULL) == -1) {
         perror("Failed to execute MY_IOCTL_SET_VALUE");

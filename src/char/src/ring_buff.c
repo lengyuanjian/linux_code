@@ -73,6 +73,30 @@ int lgz_push_data(struct lgz_ring_buff *p_this,const char *p_data, int len)
 
 }
 
+int lgz_get_capacity(struct lgz_ring_buff *p_this)
+{
+    int w = *(p_this->m_w);
+    int r = *(p_this->m_r);
+    int capacity = r - w;
+     if(w >= r)
+    {
+        capacity = p_this->m_size - w + r;
+    }
+    return capacity;
+}
+
+int lgz_get_date_len(struct lgz_ring_buff *p_this)
+{
+    int w = *(p_this->m_w);
+    int r = *(p_this->m_r);
+    int data_len =  p_this->m_size - r + w;
+    if(w >= r)
+    {
+       data_len = w - r;
+    }
+    return data_len;
+}
+
 int lgz_pop_data(struct lgz_ring_buff *p_this, char *p_data, int len)
 {
     int w = *(p_this->m_w);
@@ -80,14 +104,13 @@ int lgz_pop_data(struct lgz_ring_buff *p_this, char *p_data, int len)
     int data_len =  p_this->m_size - r + w;
     int head_capacity = 0;
 
-    if (data_len < len)
-    {
-        return -1;
-    }
-
     if(w >= r)
     {
        data_len = w - r;
+    }
+    if (data_len < len)
+    {
+        return -1;
     }
 
     if (p_this->m_size - r >= len)

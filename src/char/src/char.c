@@ -68,19 +68,16 @@ static void push_data(void)
     {
         cout -= len;
     }
-    printk(KERN_ERR "push len[%d] cut[%d] r[%d] w[%d]\n",len, cout,*(g_buff.m_r),*(g_buff.m_w));
+    //printk(KERN_ERR "push len[%d] cut[%d] r[%d] w[%d] capacity[%d] cur[%d]\n",len, cout,*(g_buff.m_r),*(g_buff.m_w), lgz_get_capacity(&g_buff), lgz_get_date_len(&g_buff));
 }
 
 static int my_thread_fn(void *data)
 {
    
-    while (!kthread_should_stop()) {
-        // 打印日志
-        
-        //if(cout >= 1024 * 10)
-            //break;
-        // 休眠 100 毫秒
-        msleep(1000);
+    while (!kthread_should_stop()) 
+    {
+        //msleep(10);
+        push_data();
     }
 
     return 0;
@@ -118,10 +115,6 @@ static long my_device_ioctl(struct file *file, unsigned int cmd, unsigned long a
     {
         case MY_IOCTL_RESET:
             // 执行复位操作
-            push_data();
-            p = (const int *)my_driver_memory;
-            printk(KERN_INFO "Device my_device_ioctl MY_IOCTL_RESET r[%u] w[%u][%u][%u]\n", p[0],p[1],p[2],p[3]);
-            
             break;
             
         case MY_IOCTL_SET_VALUE:

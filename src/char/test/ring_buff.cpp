@@ -92,15 +92,16 @@ int lgz_pop_data(struct lgz_ring_buff *p_this, char *p_data, int len)
     int data_len =  p_this->m_size - r + w;
     int head_capacity = 0;
 
+    if(w >= r)
+    {
+       data_len = w - r;
+    }
+    
     if (data_len < len)
     {
         return -1;
     }
 
-    if(w >= r)
-    {
-       data_len = w - r;
-    }
 
     if (p_this->m_size - r >= len)
     {
